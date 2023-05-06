@@ -22,13 +22,11 @@ import org.http4k.lens.ContentNegotiation
 import org.http4k.lens.string
 import org.http4k.websocket.WsMessage
 import java.io.InputStream
-import java.lang.StringBuilder
 import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.reflect.KClass
 
-//UB abstract is better than open
-abstract class ConfigurableKondorJson(
+open class ConfigurableKondorJson(
     init: JConverterResolver.() -> JConverterResolver,
     val defaultContentType: ContentType = ContentType.APPLICATION_JSON
 ) : AutoMarshallingJson<JsonNode>() {
@@ -230,9 +228,7 @@ class KondorJsonAutoMappingConfiguration internal constructor(private val regist
 fun JConverterResolver.asConfigurable() = KondorJsonAutoMappingConfiguration(this as ConfigurableKondorJson.Registry)
 
 
-//UB Q: why do we need updateNodePath? Kondor assume that you start from the root node and fix the path accordingly.
-//here it seems you want to start from leaves and go up to the root, fixing the node path at each step?
-// mmmh... maybe I can add it to Kondor node as others may need it.
+//UB:  maybe I can add a function like that to Kondor node as others may need it.
 private fun JsonNodeObject.updateNodePath(parentPath: NodePath = NodePathRoot): JsonNodeObject {
     val updatedFields = _fieldMap.map { (name, field) ->
         val nodePath = NodePathSegment(name, parentPath)
