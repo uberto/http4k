@@ -14,6 +14,7 @@ import org.http4k.lens.BiDiMapping
 import java.math.BigDecimal
 import java.math.BigInteger
 
+//UB: I suspect we can do better here, aka with much less code, but I'm not sure about the usage.
 class JBiDiMappingBoolean<OUT>(private val mapping: BiDiMapping<Boolean, OUT>) : JsonConverter<OUT, JsonNodeBoolean> {
     override val _nodeType: NodeKind<JsonNodeBoolean> = BooleanNode
     override fun fromJsonNode(node: JsonNodeBoolean): JsonOutcome<OUT> = tryFromNode(node) { mapping(node.value) }

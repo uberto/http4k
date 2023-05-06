@@ -13,6 +13,7 @@ import com.ubertob.kondor.json.jsonnode.NodePath
 import com.ubertob.kondor.json.jsonnode.NodePathRoot
 import com.ubertob.kondor.json.jsonnode.NodePathSegment
 import com.ubertob.kondor.json.jsonnode.parseJsonNode
+import com.ubertob.kondor.json.parser.compact
 import com.ubertob.kondor.json.parser.pretty
 import org.http4k.core.Body
 import org.http4k.core.ContentType
@@ -21,11 +22,13 @@ import org.http4k.lens.ContentNegotiation
 import org.http4k.lens.string
 import org.http4k.websocket.WsMessage
 import java.io.InputStream
+import java.lang.StringBuilder
 import java.math.BigDecimal
 import java.math.BigInteger
 import kotlin.reflect.KClass
 
-open class ConfigurableKondorJson(
+//UB abstract is better than open
+abstract class ConfigurableKondorJson(
     init: JConverterResolver.() -> JConverterResolver,
     val defaultContentType: ContentType = ContentType.APPLICATION_JSON
 ) : AutoMarshallingJson<JsonNode>() {
@@ -47,7 +50,7 @@ open class ConfigurableKondorJson(
         }
 
     override fun JsonNode.asPrettyJsonString(): String = this.pretty()
-    override fun JsonNode.asCompactJsonString(): String = this.render()
+    override fun JsonNode.asCompactJsonString(): String = this.compact(StringBuilder()).toString()
 
     override fun String.asJsonObject() = parseJsonNode(this).orThrow()
     override fun String?.asJsonValue() = this?.let { JsonNodeString(it, NodePathRoot) } ?: JsonNodeNull(NodePathRoot)
@@ -61,7 +64,7 @@ open class ConfigurableKondorJson(
     override fun <LIST : Iterable<Pair<String, JsonNode>>> LIST.asJsonObject() =
         JsonNodeObject(this.toMap(), NodePathRoot).updateNodePath()
 
-    override fun fields(node: JsonNode) = if (node !is JsonNodeObject) emptyList() else node._fieldMap.map { it.key to it.value }
+    override fun fields(node: JsonNode) = if (node !is JsonNodeObject) emptyList() else node._fieldMap.toList()
 
     override fun elements(value: JsonNode): Iterable<JsonNode> = when (value) {
         is JsonNodeObject -> value._fieldMap.map { it.value }
@@ -226,36 +229,10 @@ class KondorJsonAutoMappingConfiguration internal constructor(private val regist
 
 fun JConverterResolver.asConfigurable() = KondorJsonAutoMappingConfiguration(this as ConfigurableKondorJson.Registry)
 
-// Lifted the render logic from kondor-json, but changed to not output blank spaces between fields and values,
-// so that it is http4k json compliant.
-private fun JsonNode.render(): String =
-    when (this) {
-        is JsonNodeNull -> "null"
-        is JsonNodeString -> text.putInQuotes()
-        is JsonNodeBoolean -> value.toString()
-        is JsonNodeNumber -> num.toString()
-        is JsonNodeArray -> values.joinToString(separator = ",", prefix = "[", postfix = "]") {
-            it.render()
-        }
-        is JsonNodeObject -> _fieldMap.entries.joinToString(separator = ",", prefix = "{", postfix = "}") {
-            it.key.putInQuotes() + ":" + it.value.render()
-        }
-    }
 
-private val regex = """[\\"\n\r\t]""".toRegex()
-private fun String.putInQuotes(): String =
-    replace(regex) { m ->
-        when (m.value) {
-            "\\" -> "\\\\"
-            "\"" -> "\\\""
-            "\n" -> "\\n"
-            "\b" -> "\\b"
-            "\r" -> "\\r"
-            "\t" -> "\\t"
-            else -> ""
-        }
-    }.let { "\"${it}\"" }
-
+//UB Q: why do we need updateNodePath? Kondor assume that you start from the root node and fix the path accordingly.
+//here it seems you want to start from leaves and go up to the root, fixing the node path at each step?
+// mmmh... maybe I can add it to Kondor node as others may need it.
 private fun JsonNodeObject.updateNodePath(parentPath: NodePath = NodePathRoot): JsonNodeObject {
     val updatedFields = _fieldMap.map { (name, field) ->
         val nodePath = NodePathSegment(name, parentPath)
@@ -284,4 +261,3 @@ private fun JsonNodeArray.updateNodePath(parentPath: NodePath = NodePathRoot): J
     }
     return this.copy(values = updatedValues, _path = parentPath)
 }
-
