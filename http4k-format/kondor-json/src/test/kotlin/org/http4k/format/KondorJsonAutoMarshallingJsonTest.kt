@@ -96,8 +96,8 @@ private class JOutOnlyHolder(resolve: JConverterResolver) : JAny<OutOnlyHolder>(
 
 private object JArbObject : JAny<ArbObject>() {
     val string by str(ArbObject::string)
-    val child by JFieldMaybe(ArbObject::child, JArbObject)
-    val numbers by JField(ArbObject::numbers, JList(JInt))
+    val child by obj(JArbObject, ArbObject::child)
+    val numbers by array(JInt, ArbObject::numbers)
     val bool by bool(ArbObject::bool)
 
     override fun JsonNodeObject.deserializeOrThrow() = ArbObject(
@@ -115,7 +115,7 @@ private object JStringHolder : JAny<StringHolder>() {
 }
 
 private object JMapHolder : JAny<MapHolder>() {
-    val value by JField(MapHolder::value, JMap(JString))
+    val value by obj(JMap(JString), MapHolder::value)
 
     override fun JsonNodeObject.deserializeOrThrow() = MapHolder(value = +value)
 }
